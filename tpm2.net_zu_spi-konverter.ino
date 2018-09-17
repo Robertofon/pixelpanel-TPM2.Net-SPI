@@ -15,10 +15,10 @@ unsigned int localPort = 65506;      // local port to listen on
 // ground, and power), like the LPD8806 define both DATA_PIN and CLOCK_PIN
 #define DATA_PIN MOSI
 #define CLOCK_PIN SCK
-#define NUM_LEDS 4  // How many leds in your strip?
+#define NUM_LEDS 96  // How many leds in your strip?
 
 // Definiere globale Variablen
-bool debuginfo = true;
+bool debuginfo = false;
 CRGB leds[NUM_LEDS];
 WiFiUDP udpserver;
 WiFiServer httpserver(80);
@@ -166,6 +166,12 @@ void BehandleUDP()
                 ((int)packetBuffer[packetindex+2]) );
             led_index++;         
             packetindex +=3;
+            // Sicherheitsabbruch
+            if(led_index == NUM_LEDS)
+            {
+              packagenum = numpackages;
+              break;
+            }
           }
         }
       }
