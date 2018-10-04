@@ -1,13 +1,13 @@
 // Von Robert K.
 //More information at: https://www.aeq-web.com/esp32-wifi-http-webserver-und-wlan-scanner/?ref=arduinoide
 
-#include <WiFi.h>
+#include <Basecamp.hpp>
 #include <FastLED.h>
 #include <WiFiUdp.h>
 
+Basecamp iot;
+
 // Set Network Name and Password for net to login
-const char* ssid     = "Chaosnetz";
-const char* password = "ChCh1212";
 unsigned int localPort = 65506;      // local port to listen on
 
 // For led chips like Neopixels, which have a data line, ground, and power, you just
@@ -21,7 +21,6 @@ unsigned int localPort = 65506;      // local port to listen on
 bool debuginfo = false;
 CRGB leds[NUM_LEDS];
 WiFiUDP udpserver;
-WiFiServer httpserver(80);
 
 enum Stati
 {
@@ -35,10 +34,6 @@ enum Stati
 Stati status = Stati::Start;
 
 
-
-char linebuf[80];
-int charcount = 0;
-
 // Die startroutine
 void setup() 
 {
@@ -50,6 +45,13 @@ void setup()
   Serial.println(debuginfo);
   status = Stati::Unverbunden;
   Serial.println("Unverbunden");
+  
+  // basecamp innitalisieren
+  iot.begin();
+  
+  //Use the web object to add elements to the interface
+  iot.web.addInterfaceElement("color", "input", "", "#configform", "LampColor");
+  iot.web.setInterfaceElementAttribute("color", "type", "text");
 }
 
 void setupLED()
@@ -79,18 +81,36 @@ void setupLED()
     leds[i] = CRGB::DodgerBlue;
   FastLED.show();
   Serial.println("DodgerBlue");
-  delay(900);
+  delay(500);
   for( int i=0; i<NUM_LEDS; i++)
     leds[i] = CRGB::Red;
   FastLED.show();
   Serial.println("Rot");
-  delay(900);
+  delay(500);
+  for( int i=0; i<NUM_LEDS; i++)
+    leds[i] = CRGB::Yellow;
+  FastLED.show();
+  Serial.println("Gelb");
+  delay(500);
   for( int i=0; i<NUM_LEDS; i++)
     leds[i] = CRGB::Green;
   FastLED.show();
-  Serial.println("Green");
-  delay(900);
+  Serial.println("gruen");
+  delay(500);
   //fill_rainbow( &(leds[i]), 1 /*led count*/, 222 /*starting hue*/);
+  FastLED.clear();
+  FastLED.show();
+}
+
+// Blinkt einfach mal auf, um positiv zu Melden
+void BlinkLED()
+{
+  //for( int i=0; i<NUM_LEDS; i++)
+  //{
+    fill_rainbow( &(leds[0]),  NUM_LEDS, /*led count*/ 222 /*starting hue*/);
+  //}
+  FastLED.show();
+  delay(900);
   FastLED.clear();
   FastLED.show();
 }
@@ -200,18 +220,6 @@ void BehandleUDP()
   }
 }
 
-/*
- * ESP is a pain to ensure statup
- * happens on a clean slate.
- */
-void WiFiReset() 
-{
-    Serial.println("Reset WLAN");
-    WiFi.persistent(false);
-    WiFi.disconnect();
-    WiFi.mode(WIFI_OFF);
-    WiFi.mode(WIFI_STA);
-}
 
 void loop() 
 {
@@ -222,10 +230,7 @@ void loop()
       Serial.println("Setup-LEDs");
       setupLED();
 
-      Serial.print("Verbinde mit SSID ");
-      Serial.println(ssid);
-      WiFiReset();
-      WiFi.begin(ssid, password);
+      Serial.print("Verbinde mit basecamp");
       status = Stati::Verbinde;
     }
     break;
@@ -246,6 +251,7 @@ void loop()
         Serial.println("WiFi verbunden");
         Serial.println("IP-Adresse: ");
         Serial.println(WiFi.localIP());
+        BlinkLED();
         status = Stati::Verbunden;
       }
     }
@@ -277,106 +283,3 @@ void loop()
     ;
   }
 }
-
-
-/*
-  server.begin();
-  
-  // listen for incoming clients
-  WiFiClient client = server.available();
-  if (client) {
-    Serial.println("New client");
-    long rssi = WiFi.RSSI();
-    memset(linebuf, 0, sizeof(linebuf));
-    charcount = 0;
-    boolean currentLineIsBlank = true;
-    while (client.connected()) {
-      if (client.available()) {
-        char c = client.read();
-        Serial.write(c);
-        //read char by char HTTP request
-        linebuf[charcount] = c;
-        if (charcount < sizeof(linebuf) - 1) charcount++;
-        if (c == '\n' && currentLineIsBlank) {
-          // send a standard http response
-          client.println("HTTP/1.1 200 OK");
-          client.println("Content-Type: text/html");
-          client.println("Connection: close");  // the connection will be closed after completion of the response
-          client.println();
-          client.println("<!DOCTYPE HTML><html><head>");
-          client.println("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head>");
-          client.println("<h1>ESP32 WiFi HTTP Server</h1>");
-          client.print("<p>RSSI: ");
-          client.print(rssi);
-          client.println(" dBm</p>");
-          client.print("<p>Local MAC: ");
-          getMacAddress(client);
-          client.println("</p>");
-          client.print("<p>Neighborhood networks:</p>");
-          getNetworks(client);
-          client.println("");
-          client.println("</html>");
-          break;
-        }
-        if (c == '\n') {
-          // you're starting a new line
-          currentLineIsBlank = true;
-          memset(linebuf, 0, sizeof(linebuf));
-          charcount = 0;
-        } else if (c != '\r') {
-          // you've gotten a character on the current line
-          currentLineIsBlank = false;
-        }
-      }
-    }
-    // give the web browser time to receive data
-    delay(1);
-
-    // close the connection
-    client.stop();
-    Serial.println("client disconnected");
-
-
-
-void getMacAddress(WiFiClient client) 
-{
-  byte mac[6];
-  WiFi.macAddress(mac);
-  client.print(mac[5], HEX);
-  client.print(":");
-  client.print(mac[4], HEX);
-  client.print(":");
-  client.print(mac[3], HEX);
-  client.print(":");
-  client.print(mac[2], HEX);
-  client.print(":");
-  client.print(mac[1], HEX);
-  client.print(":");
-  client.println(mac[0], HEX);
-}
-
-void getNetworks(WiFiClient client) 
-{
-  int numSsid = WiFi.scanNetworks(); client.println("<table  border='1' style='width: 300px'>");
-  client.println("<tr>");
-  client.println("<th style='width: 15px'>NR</th>");
-  client.println("<th style='width: 255px'>Name</th>");
-  client.println("<th style='width: 20px'>dBm</th>");
-  client.println("</tr>");
-  for (int thisNet = 0; thisNet < numSsid; thisNet++) {
-    client.println("<tr>");
-    client.println("<td>");
-    client.print(thisNet);
-    client.println("</td>");
-    client.println("<td>");
-    client.print(WiFi.SSID(thisNet));
-    client.println("</td>");
-    client.println("<td>");
-    client.print(WiFi.RSSI(thisNet));
-    client.println("</td>");
-    client.println("</tr>");
-  }
-  client.println("</table>");
-}
-
-*/
