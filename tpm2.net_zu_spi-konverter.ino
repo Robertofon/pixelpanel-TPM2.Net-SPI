@@ -1,5 +1,8 @@
-// Von Robert K.
-//More information at: https://www.aeq-web.com/esp32-wifi-http-webserver-und-wlan-scanner/?ref=arduinoide
+
+// Von Robert K. aka robertofon
+// URL: https://github.com/Robertofon/pixelpanel-TPM2.Net-SPI
+// More information at: https://www.aeq-web.com/esp32-wifi-http-webserver-und-wlan-scanner/?ref=arduinoide
+// Basecamp:   git clone https://github.com/merlinschumacher/Basecamp.git --recurse-submodules '''
 
 #include <Basecamp.hpp>
 #include <FastLED.h>
@@ -15,12 +18,14 @@ unsigned int localPort = 65506;      // local port to listen on
 // ground, and power), like the LPD8806 define both DATA_PIN and CLOCK_PIN
 #define DATA_PIN MOSI
 #define CLOCK_PIN SCK
-#define NUM_LEDS 96  // How many leds in your strip?
+#define NUM_LEDS 96  // How many leds in your strip? Leider fix
+
 
 // Definiere globale Variablen
 bool debuginfo = false;
 CRGB leds[NUM_LEDS];
 WiFiUDP udpserver;
+const byte CmdLEDCount = 0x10;
 
 enum Stati
 {
@@ -76,6 +81,9 @@ void setupLED()
   FastLED.addLeds<WS2801, DATA_PIN, CLOCK_PIN, RGB>(leds, NUM_LEDS);
   // FastLED.addLeds<SM16716, DATA_PIN, CLOCK_PIN, RGB>(leds, NUM_LEDS);
   // FastLED.addLeds<LPD8806, DATA_PIN, CLOCK_PIN, RGB>(leds, NUM_LEDS);
+
+  // limit my draw to 4A at 5v of power draw
+  FastLED.setMaxPowerInVoltsAndMilliamps(5,3000); 
   
   for( int i=0; i<NUM_LEDS; i++)
     leds[i] = CRGB::DodgerBlue;
@@ -105,10 +113,7 @@ void setupLED()
 // Blinkt einfach mal auf, um positiv zu Melden
 void BlinkLED()
 {
-  //for( int i=0; i<NUM_LEDS; i++)
-  //{
-    fill_rainbow( &(leds[0]),  NUM_LEDS, /*led count*/ 222 /*starting hue*/);
-  //}
+  fill_rainbow( &(leds[0]),  NUM_LEDS, /*led count*/ 222 /*starting hue*/);
   FastLED.show();
   delay(900);
   FastLED.clear();
@@ -157,7 +162,42 @@ void BehandleUDP()
       }
       byte packagenum = packetBuffer[4];   // packet number 0-255 0x00 = no frame split (0x01)
       byte numpackages = packetBuffer[5];   // total packets 1-255 (0x01)
-      if (blocktype == 0xDA)
+      // Command modus  (um größeninfo zu liefern)
+      if (blocktype == 0xC0)
+      {
+        // Befehlsmodus
+        // Einziger Befehl: Lese Matrix-Size 0x10  Lesen der Anzahl angeschlossener  Pixel  0x)
+        // Erstes Byte der Nutzdaten: Kommandokontrollbyte ; Zweites Byte: Befehl
+        // Byte#1: MSB   (bit8) :  Richtung des Befehls (0=Lesebefehl, 1=Schreibbefehl) 
+        // Byte#1: MSB-1 (bit7) :  Befehl erwartet Antwort? (0=Nein, 1=Ja)
+        // Byte#1: MSB-2..LSB : Reserviert
+        if( framelength >=2 )
+        {
+          bool schreibbefehl = packetBuffer[6] & 0x80 > 0;
+          bool lesebefehl = !schreibbefehl;
+          bool antworterwartet = packetBuffer[6] & 0x40 > 0;
+          byte befehl = packetBuffer[7];
+          if( befehl == CmdLEDCount && lesebefehl && antworterwartet)
+          {
+             byte antwort[3];
+             antwort[0] = 0xAD;
+             antwort[1] = (NUM_LEDS>>8) & 0xFF;
+             antwort[2] = NUM_LEDS & 0xFF; 
+             // send a reply, to the IP address and port that sent us the packet we received
+             udpserver.beginPacket(udpserver.remoteIP(), udpserver.remotePort());
+             udpserver.write(antwort, 3);
+             udpserver.endPacket();             
+          }
+          
+        }
+        else // Fehler
+        {
+           // Befehle passen nicht in Nutzdaten weil weniger als 2 B. Fail!
+        }
+        
+      }
+      // Daten modus : Block hat 0xDA typ.
+      else if (blocktype == 0xDA)
       {
         if(debuginfo)
         {
@@ -178,7 +218,8 @@ void BehandleUDP()
           }
 
           if(debuginfo)
-          {  Serial.print("packetindex="); Serial.println(packetindex); }
+            {  Serial.print("packetindex="); Serial.println(packetindex); }
+          
           while(packetindex < (framelength + 6))
           {
             leds[led_index] = CRGB(((int)packetBuffer[packetindex]),
@@ -195,7 +236,7 @@ void BehandleUDP()
           }
         }
       }
-      else
+      else 
       {
         // Unklares UDP-Paket
         Serial.println("Ungültiges Paket bekommen.");
