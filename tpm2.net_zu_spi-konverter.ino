@@ -58,6 +58,9 @@ void setup()
   //Use the web object to add elements to the interface
   iot.web.addInterfaceElement("color", "input", "", "#configform", "LampColor");
   iot.web.setInterfaceElementAttribute("color", "type", "text");
+  
+  // WS-Handler hinzu
+  iot.web.addUrl("testurl", "InfoVorhanden\noderso", "text/plain")
 }
 
 void setupLED()
