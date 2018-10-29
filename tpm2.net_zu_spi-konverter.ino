@@ -9,6 +9,7 @@
 #include <WiFiUdp.h>
 
 Basecamp iot;
+AsyncWebSocket ws("/cmd");
 
 // Set Network Name and Password for net to login
 unsigned int localPort = 65506;      // local port to listen on
@@ -19,6 +20,8 @@ unsigned int localPort = 65506;      // local port to listen on
 #define DATA_PIN MOSI
 #define CLOCK_PIN SCK
 #define NUM_LEDS 96  // How many leds in your strip? Leider fix
+#define FIELD_WIDTH 8
+#define FIELD_HEIGHT 12
 
 
 // Definiere globale Variablen
@@ -39,6 +42,45 @@ enum Stati
 Stati status = Stati::Start;
 
 
+void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len)
+{
+  // handling code
+  if(type == WS_EVT_CONNECT)
+  {
+     Serial.println("Websocket client connection received");
+     client->text("Hello from ESP32 Server");
+  } 
+  else if(type == WS_EVT_DISCONNECT)
+  {
+    Serial.println("Client disconnected");
+  }
+  else if(type == WS_EVT_DATA)
+  {
+    // Datenempfang
+    if( len >=1)
+    {
+      switch(data[0])
+      {
+        case 1: // links
+        break;
+        case 2: // rechts
+        break;
+        case 3: // oben
+        break;
+        case 4: // unten;
+        break;
+        case 5: // A
+        break;
+        case 6: // B
+        break;
+        case 7: // start/stop
+        break;
+        
+      }
+    }
+  }
+}
+
 // Die startroutine
 void setup() 
 {
@@ -50,6 +92,14 @@ void setup()
   Serial.println(debuginfo);
   status = Stati::Unverbunden;
   Serial.println("Unverbunden");
+
+  iot.web.server.on("/test",  HTTP_GET, [](AsyncWebServerRequest * request)
+  {
+      request->send(200, "text/plain", "Hello World!");
+  });
+
+  ws.onEvent(onWsEvent);
+  iot.web.server.addHandler(&ws);
   
   // basecamp innitalisieren
   iot.begin();
