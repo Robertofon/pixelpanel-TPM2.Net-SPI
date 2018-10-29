@@ -39,6 +39,7 @@ enum Stati
   Arbeit  
 };
 
+
 Stati status = Stati::Start;
 
 
@@ -107,6 +108,9 @@ void setup()
   //Use the web object to add elements to the interface
   iot.web.addInterfaceElement("color", "input", "", "#configform", "LampColor");
   iot.web.setInterfaceElementAttribute("color", "type", "text");
+  
+  // WS-Handler hinzu
+  iot.web.addUrl("testurl", "InfoVorhanden\noderso", "text/plain")
 }
 
 void setupLED()
@@ -133,7 +137,16 @@ void setupLED()
   // FastLED.addLeds<LPD8806, DATA_PIN, CLOCK_PIN, RGB>(leds, NUM_LEDS);
 
   // limit my draw to 4A at 5v of power draw
-  FastLED.setMaxPowerInVoltsAndMilliamps(5,3000); 
+  //FastLED.setMaxPowerInVoltsAndMilliamps(5,3000); 
+  // limit brightness 
+  FastLED.setBrightness(230);
+  // Falls dithering stört (muss Show() öfters aufrufen)
+  //FastLED.setDither( 0 );
+  // Farbkalibrierung
+  FastLED.setCorrection(LEDColorCorrection::Typical8mmPixel);
+  // Farbtemperatur stellen                                         CarbonArc =0xFFFAF4, HighNoonSun =0xFFFFFB, DirectSunlight =0xFFFFFF, OvercastSky =0xC9E2FF,
+  FastLED.setTemperature(ColorTemperature::FullSpectrumFluorescent); //Candle =0xFF9329, Tungsten40W =0xFFC58F, Tungsten100W =0xFFD6AA, Halogen =0xFFF1E0,
+  
   
   for( int i=0; i<NUM_LEDS; i++)
     leds[i] = CRGB::DodgerBlue;
